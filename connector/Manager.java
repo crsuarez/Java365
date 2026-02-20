@@ -6,6 +6,8 @@ import com.microsoft.schemas.sharepoint.soap.UpdateListItems.Updates;
 import com.microsoft.schemas.sharepoint.soap.UpdateListItemsResponse.UpdateListItemsResult;
 import java.io.*;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,7 +27,6 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.ws.BindingProvider;
 import javax.xml.ws.handler.MessageContext;
-import org.apache.commons.io.IOUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
@@ -43,12 +44,8 @@ public class Manager {
 
     private static String _wsdlURL;
     private static final String _soapURL = _Constants.SOAP_URL;
-    private static final Logger _out;
+    private static final Logger _out = Logger.getLogger(Manager.class.getName());
     private static boolean instanced = false;
-
-    static {
-        _out = Logger.getLogger(Manager.class.getName());
-    }
 
     /**
      * This method do some assignation for the client.
@@ -88,11 +85,8 @@ public class Manager {
 
                 //Adding cookies support (obtained from claims-based authentication methods)
                 //portions of the code belows to http://java.net/jira/browse/JAX_WS-1044
-                Map<String, List<String>> reqHeaders = new HashMap<String, List<String>>();
-                List<String> list = new ArrayList<String>();
-                list.add(cookieToken);
-                reqHeaders.put("Cookie", list);
-                ((BindingProvider) port).getRequestContext().put(MessageContext.HTTP_REQUEST_HEADERS, reqHeaders);
+                ((BindingProvider) port).getRequestContext().put(MessageContext.HTTP_REQUEST_HEADERS,
+                        Map.of("Cookie", List.of(cookieToken)));
 
             } catch (Exception e) {
                 throw new Exception(e.getMessage());
@@ -122,15 +116,13 @@ public class Manager {
             //create string from xml tree
             //Output the XML
             //set up a transformer
-            TransformerFactory transfac = TransformerFactory.newInstance();
-            Transformer trans;// = null;
-            trans = transfac.newTransformer();
+            var transfac = TransformerFactory.newInstance();
+            var trans = transfac.newTransformer();
             trans.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
             trans.setOutputProperty(OutputKeys.INDENT, "yes");
-            StringWriter sw = new StringWriter();
-            StreamResult streamResult = new StreamResult(sw);
-            DOMSource source = new DOMSource(docToString);
-            trans.transform(source, streamResult);
+            var sw = new StringWriter();
+            var source = new DOMSource(docToString);
+            trans.transform(source, new StreamResult(sw));
             //print the XML
             returnString = returnString + sw.toString();
         } catch (TransformerException ex) {
@@ -175,8 +167,7 @@ public class Manager {
                 GetListItemsResponse.GetListItemsResult result = port.getListItems(listName,
                         viewName, query, viewFields, rowLimit, queryOptions, webID);
                 Object listResult = result.getContent().get(0);
-                if ((listResult != null) && (listResult instanceof Element)) {
-                    Element node = (Element) listResult;
+                if (listResult instanceof Element node) {
 
                     //Dumps the retrieved info in the console
                     Document document = node.getOwnerDocument();
@@ -262,10 +253,7 @@ public class Manager {
             GetListItemsResponse.GetListItemsResult result = port.getListItems(listName,
                     viewName, query, viewFields, "1", queryOptions, webID);
             Object listResult = result.getContent().get(0);
-            if ((listResult != null) && (listResult instanceof Element)) {
-                Element node = (Element) listResult;
-
-                //Dumps the retrieved info in the console
+            if (listResult instanceof Element node) {
                 //Document document = node.getOwnerDocument();
                 //_out.log(Level.OFF, "SharePoint Online Lists Web Service Response {0}", Manager.xmlToString(document));
 
@@ -303,8 +291,7 @@ public class Manager {
      * "3;#{18CD30B0-9384-4378-BFA8-5DA0EC87E2C0}" - of the item
      * @throws Exception
      */
-    public static String getIdFromLastListElement(ListsSoap port, String listName)
-            throws ParserConfigurationException, SAXException, IOException, Exception {
+    public static String getIdFromLastListElement(ListsSoap port, String listName) throws Exception {
 
         String ret = null;
 
@@ -322,10 +309,7 @@ public class Manager {
             GetListItemsResponse.GetListItemsResult result = port.getListItems(listName,
                     viewName, query, viewFields, "1", queryOptions, webID);
             Object listResult = result.getContent().get(0);
-            if ((listResult != null) && (listResult instanceof Element)) {
-                Element node = (Element) listResult;
-
-                //selects a list of nodes which have z:row elements
+            if (listResult instanceof Element node) {
                 NodeList list = node.getElementsByTagName("z:row");
                 NamedNodeMap attributes = list.item(0).getAttributes();
                 ret = attributes.getNamedItem("ows_UniqueId").getNodeValue().split(";#")[0];
@@ -353,8 +337,7 @@ public class Manager {
         GetListResult result = port.getList(listName);
         Object obj = result.getContent().get(0);
 
-        if ((obj != null) && (obj instanceof Element)) {
-            Element node = (Element) obj;
+        if (obj instanceof Element node) {
             ret = node.getAttribute("ID");
             //System.out.println("list_name: " + node.getAttribute("Name"));
             //System.out.println("list_id: " + ret);
@@ -389,8 +372,7 @@ public class Manager {
                 Updates updates = new UpdateListItems.Updates();
 
                 //Preparing the request for the update
-                Object docObj = (Object) newCompanyRequest.getRootDocument().getDocumentElement();
-                updates.getContent().add(0, docObj);
+                updates.getContent().add(0, newCompanyRequest.getRootDocument().getDocumentElement());
                 //Sending the insert request to the Lists.UpdateListItems Web Service
                 /*
                  * UpdateListItemsResult result =
@@ -428,10 +410,8 @@ public class Manager {
 
         String addAttachment = null;
         if (port != null && GUIDList != null && listItemID != null && filePath != null && fileName != null) {
-            try (FileInputStream fis = new FileInputStream(filePath)) {
-                addAttachment = port.addAttachment(GUIDList, listItemID, fileName,
-                        IOUtils.toByteArray(fis));
-            }
+            addAttachment = port.addAttachment(GUIDList, listItemID, fileName,
+                    Files.readAllBytes(Path.of(filePath)));
         }
 
         return addAttachment;
@@ -459,7 +439,7 @@ public class Manager {
         String addAttachment = null;
         if (port != null && GUIDList != null && listItemID != null && fileName != null && inputStream != null) {
             addAttachment = port.addAttachment(GUIDList, listItemID, fileName,
-                    IOUtils.toByteArray(inputStream));
+                    inputStream.readAllBytes());
         }
 
         return addAttachment;
