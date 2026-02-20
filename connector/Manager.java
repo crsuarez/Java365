@@ -4,7 +4,6 @@ import com.microsoft.schemas.sharepoint.soap.GetListResponse.GetListResult;
 import com.microsoft.schemas.sharepoint.soap.*;
 import com.microsoft.schemas.sharepoint.soap.UpdateListItems.Updates;
 import com.microsoft.schemas.sharepoint.soap.UpdateListItemsResponse.UpdateListItemsResult;
-import com.sun.org.apache.xerces.internal.dom.ElementNSImpl;
 import java.io.*;
 import java.net.URL;
 import java.util.ArrayList;
@@ -13,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.xml.XMLConstants;
 import javax.xml.namespace.QName;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -27,6 +27,7 @@ import javax.xml.ws.BindingProvider;
 import javax.xml.ws.handler.MessageContext;
 import org.apache.commons.io.IOUtils;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -174,8 +175,8 @@ public class Manager {
                 GetListItemsResponse.GetListItemsResult result = port.getListItems(listName,
                         viewName, query, viewFields, rowLimit, queryOptions, webID);
                 Object listResult = result.getContent().get(0);
-                if ((listResult != null) && (listResult instanceof ElementNSImpl)) {
-                    ElementNSImpl node = (ElementNSImpl) listResult;
+                if ((listResult != null) && (listResult instanceof Element)) {
+                    Element node = (Element) listResult;
 
                     //Dumps the retrieved info in the console
                     Document document = node.getOwnerDocument();
@@ -225,6 +226,10 @@ public class Manager {
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setValidating(false);
+        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
         DocumentBuilder builder = factory.newDocumentBuilder();
         Document documentOptions = builder.parse(new InputSource(new StringReader(sXML)));
         Node elementOptions = documentOptions.getDocumentElement();
@@ -257,8 +262,8 @@ public class Manager {
             GetListItemsResponse.GetListItemsResult result = port.getListItems(listName,
                     viewName, query, viewFields, "1", queryOptions, webID);
             Object listResult = result.getContent().get(0);
-            if ((listResult != null) && (listResult instanceof ElementNSImpl)) {
-                ElementNSImpl node = (ElementNSImpl) listResult;
+            if ((listResult != null) && (listResult instanceof Element)) {
+                Element node = (Element) listResult;
 
                 //Dumps the retrieved info in the console
                 //Document document = node.getOwnerDocument();
@@ -317,8 +322,8 @@ public class Manager {
             GetListItemsResponse.GetListItemsResult result = port.getListItems(listName,
                     viewName, query, viewFields, "1", queryOptions, webID);
             Object listResult = result.getContent().get(0);
-            if ((listResult != null) && (listResult instanceof ElementNSImpl)) {
-                ElementNSImpl node = (ElementNSImpl) listResult;
+            if ((listResult != null) && (listResult instanceof Element)) {
+                Element node = (Element) listResult;
 
                 //selects a list of nodes which have z:row elements
                 NodeList list = node.getElementsByTagName("z:row");
@@ -348,8 +353,8 @@ public class Manager {
         GetListResult result = port.getList(listName);
         Object obj = result.getContent().get(0);
 
-        if ((obj != null) && (obj instanceof ElementNSImpl)) {
-            ElementNSImpl node = (ElementNSImpl) obj;
+        if ((obj != null) && (obj instanceof Element)) {
+            Element node = (Element) obj;
             ret = node.getAttribute("ID");
             //System.out.println("list_name: " + node.getAttribute("Name"));
             //System.out.println("list_id: " + ret);
@@ -391,8 +396,8 @@ public class Manager {
                  * UpdateListItemsResult result =
                  */
                 UpdateListItemsResult updateListItems = port.updateListItems(listName, updates);
-                com.sun.org.apache.xerces.internal.dom.ElementNSImpl get = (com.sun.org.apache.xerces.internal.dom.ElementNSImpl) updateListItems.getContent().get(0);
-                //com.sun.org.apache.xerces.internal.dom.ElementNSImpl
+                Element get = (Element) updateListItems.getContent().get(0);
+                //Element
                 Manager.xmlToString(get.getOwnerDocument());
 
             } catch (Exception e) {
@@ -423,8 +428,10 @@ public class Manager {
 
         String addAttachment = null;
         if (port != null && GUIDList != null && listItemID != null && filePath != null && fileName != null) {
-            addAttachment = port.addAttachment(GUIDList, listItemID, fileName,
-                    IOUtils.toByteArray(new FileInputStream(filePath)));
+            try (FileInputStream fis = new FileInputStream(filePath)) {
+                addAttachment = port.addAttachment(GUIDList, listItemID, fileName,
+                        IOUtils.toByteArray(fis));
+            }
         }
 
         return addAttachment;
