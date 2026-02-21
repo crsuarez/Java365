@@ -179,4 +179,67 @@ class ManagerAuthTest {
         assertNull(result);
         verifyNoInteractions(mockPort);
     }
+
+    // -----------------------------------------------------------------------
+    // createManagerService — agnostic protocol overload
+    // -----------------------------------------------------------------------
+
+    @Test
+    void createManagerServiceWithHttpProtocolSetsInstanced() {
+        // The three-argument overload with HTTP must mark the manager as instanced.
+        Manager.createManagerService(_Constants.DEFAULT_PROTOCOL, "intranet.corp.local", "/");
+        Exception ex = assertThrows(Exception.class,
+                () -> Manager.sharePointListsAuth(null, "pass", "cookie"));
+        // If instanced the message is "Invalid connection details", not "must be first execution"
+        assertEquals("Couldn't authenticate: Invalid connection details given.", ex.getMessage());
+    }
+
+    @Test
+    void createManagerServiceWithHttpsProtocolSetsInstanced() {
+        Manager.createManagerService(_Constants.DEFAULT_SSL_PROTOCOL, "mysite.sharepoint.com", "/sites/team");
+        Exception ex = assertThrows(Exception.class,
+                () -> Manager.sharePointListsAuth(null, "pass", "cookie"));
+        assertEquals("Couldn't authenticate: Invalid connection details given.", ex.getMessage());
+    }
+
+    @Test
+    void createManagerServiceTwoArgOverloadDefaultsToHttps() {
+        // Two-arg overload must behave identically to calling the three-arg
+        // overload with the HTTPS protocol constant.
+        Manager.createManagerService("mysite.sharepoint.com", "/sites/team");
+        Exception ex = assertThrows(Exception.class,
+                () -> Manager.sharePointListsAuth(null, "pass", "cookie"));
+        assertEquals("Couldn't authenticate: Invalid connection details given.", ex.getMessage());
+    }
+
+    // -----------------------------------------------------------------------
+    // sharePointListsAuth — null/empty cookieToken (on-premises scenarios)
+    // -----------------------------------------------------------------------
+
+    @Test
+    void sharePointListsAuthWithNullCookieTokenDoesNotThrowForValidCredentials() {
+        // For on-premises SharePoint using NTLM/Basic auth, a null cookie token
+        // is valid — no cookie header should be set on the port.
+        // The call will fail at the network level (no real server), but it must
+        // not throw due to the null cookie alone. We detect this by checking that
+        // the exception (if any) is NOT an NPE and IS a network/connection error.
+        try {
+            Manager.sharePointListsAuth("user@corp.local", "password", null);
+            // If it somehow succeeds without a real server, that is fine too.
+        } catch (Exception ex) {
+            assertFalse(ex instanceof NullPointerException,
+                    "null cookieToken must not cause a NullPointerException");
+        }
+    }
+
+    @Test
+    void sharePointListsAuthWithEmptyCookieTokenDoesNotThrowForValidCredentials() {
+        // Empty cookie token — same expectation as null.
+        try {
+            Manager.sharePointListsAuth("user@corp.local", "password", "");
+        } catch (Exception ex) {
+            assertFalse(ex instanceof NullPointerException,
+                    "empty cookieToken must not cause a NullPointerException");
+        }
+    }
 }

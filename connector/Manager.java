@@ -48,14 +48,30 @@ public class Manager {
     private static boolean instanced = false;
 
     /**
-     * This method do some assignation for the client.
+     * This method does some assignments for the client. Uses HTTPS as the
+     * default protocol, which is the standard for SharePoint Online (Office 365).
      *
      * @param endPoint the url of your site, without the protocol. ie.
      * yoursite.sharepoint.com
      * @param relPathToListLocation the path in where is your list.
      */
     public static void createManagerService(String endPoint, String relPathToListLocation) {
-        Manager._wsdlURL = _Constants.DEFAULT_SSL_PROTOCOL + endPoint + relPathToListLocation + _Constants.WSDL_PATH;
+        createManagerService(_Constants.DEFAULT_SSL_PROTOCOL, endPoint, relPathToListLocation);
+    }
+
+    /**
+     * This method does some assignments for the client, using an explicit protocol.
+     * Use this overload when connecting to a non-Office 365 environment (e.g.
+     * on-premises SharePoint over plain HTTP).
+     *
+     * @param protocol the protocol to use, e.g. {@link _Constants#DEFAULT_PROTOCOL}
+     * ({@code "http://"}) or {@link _Constants#DEFAULT_SSL_PROTOCOL} ({@code "https://"}).
+     * @param endPoint the url of your site, without the protocol. ie.
+     * yoursite.sharepoint.com
+     * @param relPathToListLocation the path in where is your list.
+     */
+    public static void createManagerService(String protocol, String endPoint, String relPathToListLocation) {
+        Manager._wsdlURL = protocol + endPoint + relPathToListLocation + _Constants.WSDL_PATH;
         Manager.instanced = true;
     }
 
@@ -85,8 +101,10 @@ public class Manager {
 
                 //Adding cookies support (obtained from claims-based authentication methods)
                 //portions of the code belows to http://java.net/jira/browse/JAX_WS-1044
-                ((BindingProvider) port).getRequestContext().put(MessageContext.HTTP_REQUEST_HEADERS,
-                        Map.of("Cookie", List.of(cookieToken)));
+                if (cookieToken != null && !cookieToken.isEmpty()) {
+                    ((BindingProvider) port).getRequestContext().put(MessageContext.HTTP_REQUEST_HEADERS,
+                            Map.of("Cookie", List.of(cookieToken)));
+                }
 
             } catch (Exception e) {
                 throw new Exception(e.getMessage());

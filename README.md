@@ -1,6 +1,6 @@
-# Java365 — SharePoint Online SOAP Connector
+# Java365 — SharePoint SOAP Connector
 
-A Java library for interacting with **SharePoint Online** (Office 365) list data via the legacy SOAP (`Lists.asmx`) web service. It handles claims-based authentication, CAML query construction, list item CRUD, and file attachments.
+A Java library for interacting with **SharePoint** list data via the legacy SOAP (`Lists.asmx`) web service. It supports **SharePoint Online** (Office 365) out of the box and can be configured for **on-premises SharePoint** deployments by supplying a custom protocol, STS URL, or skipping cookie-based authentication entirely.
 
 ---
 
@@ -26,7 +26,7 @@ A Java library for interacting with **SharePoint Online** (Office 365) list data
 | **Maven** | 3.9 | Tested with Apache Maven 3.9.x |
 | **wsimport** | bundled with JDK 8 | Required only at build time. See [wsimport note](#wsimport-note) below. |
 | Internet access (build) | — | Maven downloads dependencies from Maven Central on first build. |
-| SharePoint Online tenant | — | Required only at runtime for live calls. Tests run fully offline. |
+| SharePoint tenant | — | Required only at runtime for live calls. Tests run fully offline. Supports SharePoint Online and on-premises deployments. |
 
 ### wsimport note
 
@@ -152,8 +152,8 @@ Expected output:
 [INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0  -- ManagerXmlTest
 [INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0  -- ConstantsTest
 [INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0  -- ListsRequestTest
-[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0  -- ManagerAuthTest
-[INFO] Tests run: 51, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 21, Failures: 0, Errors: 0, Skipped: 0  -- ManagerAuthTest
+[INFO] Tests run: 56, Failures: 0, Errors: 0, Skipped: 0
 [INFO] BUILD SUCCESS
 ```
 
@@ -278,14 +278,16 @@ mvn test -Dsurefire.useFile=false
 | `ConstantsTest` | 10 | Every constant in `_Constants` |
 | `ListsRequestTest` | 14 | CAML batch XML structure, all three request types, `createListItem` field generation and error paths |
 | `ManagerXmlTest` | 11 | `generateXmlNode()` XML parsing, XXE/DOCTYPE attack blocking, `xmlToString()` output format |
-| `ManagerAuthTest` | 16 | `sharePointListsAuth` preconditions, null-safety guards, mocked SOAP port delegation |
-| **Total** | **51** | |
+| `ManagerAuthTest` | 21 | `sharePointListsAuth` preconditions, null-safety guards, mocked SOAP port delegation; protocol overload and null/empty cookie-token handling for on-premises scenarios |
+| **Total** | **56** | |
 
 ---
 
 ## Using the Connector in Your Code
 
-### Step 1 — Authenticate
+### SharePoint Online (Office 365)
+
+#### Step 1 — Authenticate
 
 ```java
 // Initialise the endpoint (called once per session, before any other Manager calls)
@@ -302,6 +304,40 @@ ListsSoap port = Manager.sharePointListsAuth(
         "user@yoursite.onmicrosoft.com",
         "YourPassword",
         client.getCookieNedToken());
+```
+
+### On-Premises SharePoint (HTTP / custom STS)
+
+For on-premises deployments use the overloaded constructors that accept an explicit
+protocol and/or a custom STS URL.
+
+#### HTTP endpoint
+
+```java
+// Pass the protocol explicitly — on-prem sites often run over plain HTTP
+Manager.createManagerService("http://", "intranet.corp.local", "/sites/your-site");
+```
+
+#### Custom STS (ADFS)
+
+```java
+// Supply your ADFS / custom STS endpoint instead of the Microsoft Online default
+SharePointClient client = new SharePointClient(
+        "DOMAIN\\user",
+        "YourPassword",
+        "intranet.corp.local",
+        "https://adfs.corp.local/adfs/services/trust/13/usernamemixed");
+```
+
+#### NTLM / Basic auth without cookie token
+
+On-premises SharePoint often relies on NTLM or Basic authentication instead of
+cookie-based claims. Pass `null` as the `cookieToken`; the connector will omit the
+`Cookie` header and rely solely on the username and password set on the SOAP binding.
+
+```java
+Manager.createManagerService("http://", "intranet.corp.local", "/sites/your-site");
+ListsSoap port = Manager.sharePointListsAuth("DOMAIN\\user", "YourPassword", null);
 ```
 
 ### Step 2 — Read a list
