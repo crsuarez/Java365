@@ -36,15 +36,33 @@ public class SharePointClient {
     }
 
     /**
-     * Default constructor for the SharePoint Client
+     * Default constructor for the SharePoint Client. Uses the Microsoft Online
+     * STS ({@link _Constants#EXTSTS_SRF_URL}) for claims-based authentication,
+     * which is the standard endpoint for SharePoint Online (Office 365).
      *
      * @param userName string with username, username@domain.com
      * @param password string with the password for the username submitted
      * @param endPoint string with the target to prepare de SAML file that is
-     * going to be sended to the STS (Security Token Service).
+     * going to be sent to the STS (Security Token Service).
      */
     public SharePointClient(String userName, String password, String endPoint) throws Exception {
-        this._tokenSPO = _Constants.EXTSTS_SRF_URL;
+        this(userName, password, endPoint, _Constants.EXTSTS_SRF_URL);
+    }
+
+    /**
+     * Constructor for the SharePoint Client with a custom STS URL. Use this
+     * overload when connecting to a non-Office 365 environment (e.g. on-premises
+     * SharePoint with ADFS or a custom Security Token Service).
+     *
+     * @param userName string with username
+     * @param password string with the password for the username submitted
+     * @param endPoint string with the target SharePoint host (without protocol),
+     * used to build the login endpoint and the SAML token request.
+     * @param stsUrl   the full URL of the Security Token Service (STS) that will
+     * validate the SAML request and issue the binary security token.
+     */
+    public SharePointClient(String userName, String password, String endPoint, String stsUrl) throws Exception {
+        this._tokenSPO = stsUrl;
         this.SSLendPoint = _Constants.DEFAULT_SSL_PROTOCOL + endPoint + _Constants.DEFAULT_LOGIN_PATH;
         this.userName = userName;
         this.password = password;
